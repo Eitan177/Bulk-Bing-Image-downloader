@@ -58,6 +58,7 @@ def download(pool_sema: threading.Semaphore, url: str, output_dir: str):
         in_progress -= 1
 
 def fetch_images_from_keyword(pool_sema: threading.Semaphore, keyword: str, output_dir: str, filters: str, limit: int):
+    url_store={}
     current = 0
     last = ''
     while True:
@@ -71,6 +72,8 @@ def fetch_images_from_keyword(pool_sema: threading.Semaphore, keyword: str, outp
         response=urllib.request.urlopen(request)
         html = response.read().decode('utf8')
         links = re.findall('murl&quot;:&quot;(.*?)&quot;',html)
+        plinks = re.findall('purl&quot;:&quot;(.*?)&quot;',html)
+
         try:
             if links[-1] == last:
                 return
@@ -79,8 +82,20 @@ def fetch_images_from_keyword(pool_sema: threading.Semaphore, keyword: str, outp
                     return
                 t = threading.Thread(target = download,args = (pool_sema, link, output_dir))
                 t.start()
+                path = urllib.parse.urlsplit(link).path
+                filename = posixpath.basename(path).split('?')[0] #Strip GET parameters from filename
+                name, ext = os.path.splitext(filename)
+                name = name[:36].strip()
+                filename = name + ext
+                print(filename)
+
+                url_store[filename]=plinks[index]
+
+                with open('url.dictionary', 'wb') as url_dictionary_file:
+                  pickle.dump(url_store, url_dictionary_file)                
+                print(url_store)
                 current += 1
-            last = links[-1]
+                last = links[-1]
         except IndexError:
             print('No search results for "{0}"'.format(keyword))
             return
